@@ -1,3 +1,4 @@
 gptmodels
 checkpoints
 logging
+vector_store

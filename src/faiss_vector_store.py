@@ -1,11 +1,12 @@
 import os.path
 
 import faiss
+import numpy as np
 import pandas as pd
 
 from embedding_generator import EmbeddingGenerator
-from utils import logger, vector_paths
-import json
+from utils import logger, vector_paths, parse_context
+from tqdm import tqdm
 
 
 class FaissVectorStore:
@@ -25,18 +26,27 @@ class FaissVectorStore:
             logger.info("Data store not found. Creating a new data store")
             self.data_store = pd.DataFrame()
 
-    def add_vector(self, data: dict) -> None:
+    def add_vector(self, data: pd.DataFrame) -> None:
 
-        #logger.info("Adding vector to the vector store")
-        embedding = self.embedding_generator.generate_embeddings(json.dumps(data))
+        logger.info("Adding vector to the vector store")
+        embeddings = []
 
-        if embedding.shape[-1] != self.index.d:
-            logger.error(f"Embedding dimension mismatch: {embedding.shape[-1]} != {self.index.d}")
-            return
+        for _, data in tqdm(data.iterrows()):
+            case_info = "Case Description: {} \n Valuable Information: {}".format(data["case_description"],
+                                                                                 data["important_feature"])
+            embedding = self.embedding_generator.generate_embeddings(case_info)
 
-        self.index.add(embedding)
-        #logger.info("Adding embedding corresponding record to the data store")
-        self.data_store = pd.concat([self.data_store, pd.DataFrame([data])], ignore_index=True)
+            if embedding.shape[-1] != self.index.d:
+                logger.error(f"Embedding dimension mismatch: {embedding.shape[-1]} != {self.index.d}")
+                return
+            embeddings.append(embedding)
+
+        embeddings = np.vstack(embeddings)
+        self.index.add(embeddings)
+        logger.info("Adding embedding corresponding records to the data store")
+        logger.info(f"Data to be maintained shape: {data.shape}")
+        logger.info(f"Data store shape: {self.data_store.shape}")
+        self.data_store = pd.concat([self.data_store, data], ignore_index=True)
 
     def retrieve_context(self, query, top_k=3):
         logger.info(f"Retrieving context for query: {query}")
@@ -44,8 +54,10 @@ class FaissVectorStore:
         query_embedding = self.embedding_generator.generate_embeddings(query)
         query_embedding_np = query_embedding.astype('float32').reshape(1, -1)
         distances, index = self.index.search(query_embedding_np, top_k)
-
-        context = "\n".join([row for row in self.data_store.iloc[index[0]].to_dict(orient="records")])
+        logger.info(f"Top {top_k} results: {index}")
+        logger.info(f"Index type: {type(index)} and of shape: {index.shape}")
+        logger.info(f"First 5 rows of data store: {self.data_store.head()}")
+        context = "\n".join([parse_context(row) for row in self.data_store.iloc[index[0], :].to_dict(orient="records")])
         return context
 
     def save_index(self, index_path="", data_path=""):
@@ -60,4 +72,3 @@ class FaissVectorStore:
 
         logger.info(f"Saving data store to {data_path}")
         self.data_store.to_csv(data_path, index=False)
-
