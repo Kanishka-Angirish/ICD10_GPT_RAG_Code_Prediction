@@ -14,7 +14,6 @@ torch~=2.5.1
 tensorflow
 faiss-cpu
 ipython~=8.31.0
-zlib~=1.2.13
 pygments~=2.18.0
 tqdm~=4.67.1
 setuptools~=75.1.0

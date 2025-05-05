@@ -1,42 +1,108 @@
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 
 inference_prompt_template = """
-You are a helpful biomedical assistant and your task is to interpret the case and infer the valuable information.
-Refer to the below example to understand the task. DO NOT USE any information from the example while inferring the valuable information
-from the case description provided by user. USE IT ONLY FOR UNDERSTANDING THE TASK.
+You are a helpful biomedical assistant. Your task is to analyze the given patient case 
+description and extract the valuable information while maintaining relevance and accuracy.
 
-For example:
-============
-## Example Case Description: Patient is a 65-year-old female presenting with symptoms of heart failure. 
-Echocardiogram confirms nonrheumatic aortic valve insufficiency, with a regurgitant fraction of 30%. 
-Patient reports fatigue and mild peripheral edema. Surgical valve replacement is being considered.
+## Guidelines:
 
-## Valuable Information: Nonrheumatic aortic (valve) insufficiency
+- Use the provided examples (additional_context) only to understand the expected format and level of detail. Do not 
+extract or reuse information from them. 
 
-Provide the inferred valuable information as an output in the following json format:
+- Identify key features and contextual details relevant to the case description. 
+Refer to the examples to understand how key features are identified and structured in valuable 
+information. 
+
+- Maintain consistency in the length and specificity of the inferred valuable information. Use the 
+examples to analyze the appropriate level of detail and structure for your response.
+
+## Understanding the Task - Reference Examples:
+
+{additional_context}
+
+## Output Format:
+
+Provide the inferred valuable information in the following JSON format:
 
 "inferred_info": "valuable_information"
 """
 
-icd_code_prediction_prompt_template = """
-You are a helpful biomedical assistant and your task is to predict the ICD-10 code for the given case description.
-Also refer to the following example to understand how ICD-10 code is generated for respective case description and 
-corresponding valuable information. DO NOT USE any information from the example while predicting the ICD-10 code for the 
-user provided case description. USE IT ONLY FOR UNDERSTANDING THE TASK.
+gpt_diagnosis_inference_prompt_template = """
+You are a skilled medical extraction specialist who identifies medical diagnoses from clinical documentation. 
+Your task is to analyze the provided text and extract all medical diagnoses, including those that need to be 
+inferred from described symptoms.
 
-## Examples for Understanding the Task
-=======================================
+### Strict Extraction Guidelines:
+- List each diagnosis on a separate line
+- Expand all medical abbreviations (e.g., HTN → Hypertension)
+- Identify implied diagnoses from clinical findings (e.g., "high blood glucose" → Diabetes Mellitus)
+- Consider contextual information to make appropriate clinical inferences
+- Use standard medical terminology aligned with ICD-10 coding conventions
 
-{context}
+### Important Notes:
+- Make appropriate clinical inferences (e.g., "elevated heart rate" → Tachycardia)
+- Include both the original description and your clinical interpretation when making inferences
+- Maintain clinical accuracy in your extractions
+- Extract diagnoses only, not procedures, medications, or other clinical elements
 
-## User provided case description 
-==================================
- 
-Case Description: {caseinfo}
-Valuable Information: {inferred_info} 
-ICD-10 Code is:
+### Output Format:
+Provide the extracted diagnosis details in the following python list format strictly without including any other information:
+
+[
+    "Relevant medical diagnosis 1",
+    "Relevant medical diagnosis 2",
+    "Relevant medical diagnosis 3",
+    ...
+]
 """
-inference_prompt = PromptTemplate(template=inference_prompt_template, input_variables=["caseinfo"])
+
+icd_code_prediction_prompt_template_biogpt = """
+You are a biomedical assistant specialized in ICD-10 medical coding. Your task is to determine the most appropriate ICD-10 code  
+for the given case description by analyzing the retrieved ICD-10 codes along with the user-provided details.
+
+## User-Provided Case Description  
+==================================
+{caseinfo}
+
+## Valuable Information Extracted from User's Case Description  
+==============================================================
+{inferred_info}
+
+## Retrieved Top 10 ICD-10 Codes  
+==================================
+{code_context}
+
+Now, while predicting the ICD-10 code for the user-provided case description, **consider all of the following**:  
+- The **user-provided case description** to understand the context and symptoms.  
+- The **valuable information extracted** from the case description to identify key medical insights.  
+- The **description of the top-3 retrieved ICD-10 codes** retrieved by RAG for comparison.  
+
+Based on this analysis, the most appropriate ICD-10 Code is:
+"""
+
+icd_code_prediction_prompt_template_gpt = """
+You are a biomedical assistant specialized in ICD-10 medical coding. Your task is to determine the most appropriate ICD-10 code  
+for the given case description by analyzing the retrieved ICD-10 codes along with the user-provided details.
+
+Now, while finalizing the ICD-10 code for the user-provided case description, **consider all of the following**:  
+- The **user-provided case description** to understand the context and symptoms.  
+- The **valuable information extracted** from the case description to identify key medical insights.  
+- The **description of the top-10 retrieved ICD-10 codes** retrieved by RAG for comparison.  
+
+## Important Instruction for Generating ICD-10 Code for the User-Provided Case Description: 
+- CHOOSE ONLY ONE BST SUITED ICD-10 CODE FROM THE LIST OF TOP 10 RETRIEVED ICD-10 CODES BY RAG FOR THE USER-PROVIDED CASE DESCRIPTION. 
+
+- AVOID WORD TO WORD COMPARISON OF THE VALUABLE INFORMATION WITH THE RETRIEVED ICD-10 CODES DESCRIPTIONS. INSTEAD, 
+FOCUS ON THE MEDICAL INSIGHTS AND SYMPTOMS TO DETERMINE THE MOST APPROPRIATE ICD-10 CODE.
+
+- GIVE EQUAL IMPORTANCE TO THE USER-PROVIDED CASE DESCRIPTION, VALUABLE INFORMATION EXTRACTED, AND THE DESCRIPTION OF 
+THE TOP 10 RETRIEVED ICD-10 CODES WHILE MAKING THE FINAL DECISION.
+
+## Output Format:
+Provide the most appropriate ICD-10 Code based on the analysis in the following format. 
+"icd_code": "ICD-10 Code"
+"""
+#inference_prompt = PromptTemplate(template=inference_prompt_template, input_variables=["caseinfo"])
 inference_chat_prompt = ChatPromptTemplate.from_messages(messages=[
     (
         "system",
@@ -45,13 +111,53 @@ inference_chat_prompt = ChatPromptTemplate.from_messages(messages=[
     ("human", "{caseinfo}")
 ])
 
-prediction_chat_prompt = ChatPromptTemplate.from_messages(messages=[
+inference_diagnosis_prompt = ChatPromptTemplate.from_messages(messages=[
     (
         "system",
-        icd_code_prediction_prompt_template
+        gpt_diagnosis_inference_prompt_template
     ),
-    ("human", "{caseinfo} \n {inferred_info} \n {context}")
+    ("human", "{caseinfo}")
 ])
-prediction_prompt = PromptTemplate(template=icd_code_prediction_prompt_template, input_variables=["caseinfo",
+
+human_chat = """
+## User-Provided Case Description  
+==================================
+{caseinfo}
+
+## Valuable Information Extracted from User's Case Description  
+==============================================================
+{inferred_info}
+
+## Retrieved Top 3 ICD-10 Codes from RAG 
+==========================================
+{code_context}
+"""
+
+human_chat_case_report = """
+## User-Provided Case Description and Valuable Information 
+==========================================================
+{caseinfo}
+
+## Retrieved Top 3 ICD-10 Codes from RAG 
+==========================================
+{code_context}
+"""
+
+prediction_chat_gpt_prompt = ChatPromptTemplate.from_messages(messages=[
+    (
+        "system",
+        icd_code_prediction_prompt_template_gpt
+    ),
+    ("human", human_chat)
+])
+
+prediction_chat_gpt_report_prompt = ChatPromptTemplate.from_messages(messages=[
+    (
+        "system",
+        icd_code_prediction_prompt_template_gpt
+    ),
+    ("human", human_chat_case_report)
+])
+prediction_prompt = PromptTemplate(template=icd_code_prediction_prompt_template_biogpt, input_variables=["caseinfo",
                                                                                                   "inferred_info",
                                                                                                   "context"])

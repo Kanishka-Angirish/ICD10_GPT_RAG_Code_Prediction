@@ -3,28 +3,43 @@ This file consist of the BioGPT Models used for different purposes in the projec
 
 Author: Kanishka Angirish
 """
-from langchain.chains.llm import LLMChain
-from langchain_core.prompts import PromptTemplate
+
 from transformers import pipeline
 from transformers import (
     BioGptTokenizer, BioGptForCausalLM
 )
 from langchain.llms import HuggingFacePipeline
-from langchain_openai import AzureOpenAI
-import torch
+from langchain_openai import AzureOpenAIEmbeddings, AzureOpenAI, AzureChatOpenAI
 import os
+
 from utils import OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
 
 # Setting up API KEY AND ENDPOINT
-os.environ["OPENAI_API_VERSION"] = "2024-08-01-preview"
+os.environ["OPENAI_API_VERSION"] = "2024-10-21"
 os.environ["AZURE_OPENAI_ENDPOINT"] = AZURE_OPENAI_ENDPOINT
 os.environ["AZURE_OPENAI_API_KEY"] = AZURE_OPENAI_API_KEY
 
 # Pre-trained BioGpt Model
 causal_model = BioGptForCausalLM.from_pretrained("microsoft/biogpt-large")
+
+# Azure OpenAI Model
 llm_model = AzureOpenAI(
     azure_deployment="gpt-35-turbo-instruct",
-    api_version = os.environ["OPENAI_API_VERSION"],
+    api_version=os.environ["OPENAI_API_VERSION"],
+    temperature=0,
+    max_retries=2
+)
+
+# Azure Embedding Model
+embedding_model = AzureOpenAIEmbeddings(
+    azure_deployment="text-embedding-ada-002",
+    openai_api_version="2023-05-15"
+)
+
+# Azure GPT-4 Model
+chat_model = AzureChatOpenAI(
+    azure_deployment="gpt-4-32k",
+    openai_api_version="2024-10-21",
     temperature=0,
     max_retries=2
 )
@@ -38,11 +53,3 @@ causal_generator = pipeline("text-generation", model=causal_model, tokenizer=tok
 
 # Wrap the hugging face pipeline around LangChain
 causal_llm = HuggingFacePipeline(pipeline=causal_generator)
-
-"""
-prompt = PromptTemplate(template="{caseinfo}",
-                        input_variables=["caseinfo"])
-chain = LLMChain(llm=causal_llm, prompt=prompt)
-response = chain.invoke("Consider yourself a patient with a history of heart disease and diabetes. You are experiencing chest pain and shortness of breath. What should you do?")
-print(f"Text Completion Response is: {response}")
-"""
