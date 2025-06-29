@@ -1,6 +1,6 @@
 import ast
 
-from bioGPT import causal_model, llm_model, embedding_model, chat_model
+from gptmodels import causal_model, llm_model, embedding_model, chat_model
 from utils import logger, vector_paths, get_code_description, extract_code_from_biogpt_response, \
     prediction_accuracy, retrieve_rag_codes, generate_new_report_data
 from faiss_vector_store import FaissVectorStore
