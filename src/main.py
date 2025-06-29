@@ -1,6 +1,6 @@
 import ast
 
-from bioGPT import causal_llm, causal_model, llm_model, embedding_model, chat_model
+from bioGPT import causal_model, llm_model, embedding_model, chat_model
 from utils import logger, vector_paths, get_code_description, extract_code_from_biogpt_response, \
     prediction_accuracy, retrieve_rag_codes, generate_new_report_data
 from faiss_vector_store import FaissVectorStore
@@ -10,7 +10,7 @@ from tqdm import tqdm
 import datetime
 import os
 import pandas as pd
-from prompts import inference_chat_prompt, prediction_chat_gpt_prompt, prediction_prompt, \
+from prompts import inference_chat_prompt, prediction_chat_gpt_prompt, \
     prediction_chat_gpt_report_prompt, inference_diagnosis_prompt
 from langchain.chains.llm import LLMChain
 
@@ -43,12 +43,14 @@ def icd_code_prediction(case_info: str,
     code_context = code_faiss_vector_store.retrieve_context(query=valuable_information, top_k=10)
     rag_codes = retrieve_rag_codes(code_context)
     logger.info(f"ICD Code Context: \n {code_context}")
+    #if model_type == "1":
+    #    second_prompt_chain = LLMChain(llm=causal_llm, prompt=prediction_prompt)
     if model_type == "1":
-        second_prompt_chain = LLMChain(llm=causal_llm, prompt=prediction_prompt)
-    elif model_type == "3":
         second_prompt_chain = LLMChain(llm=chat_model, prompt=prediction_chat_gpt_prompt)
-    else:
+    elif model_type == "2":
         second_prompt_chain = LLMChain(llm=llm_model, prompt=prediction_chat_gpt_prompt)
+    else:
+        raise ValueError("Invalid model type selected. Please choose 1 or 2")
 
     prediction_response = second_prompt_chain.invoke(input={"caseinfo": case_info,
                                                             "inferred_info": valuable_information,
@@ -74,12 +76,15 @@ def icd_code_prediction_report(case_info: str, model_type: str) -> tuple:
     code_context = code_faiss_vector_store.retrieve_context(query=case_info, top_k=10)
     rag_codes = retrieve_rag_codes(code_context)
     logger.info(f"ICD Code Context: \n {code_context}")
+    #if model_type == "1":
+        # Not needed any longer (Deprecated)
+        #second_prompt_chain = LLMChain(llm=causal_llm, prompt=prediction_chat_gpt_report_prompt)
     if model_type == "1":
-        second_prompt_chain = LLMChain(llm=causal_llm, prompt=prediction_chat_gpt_report_prompt)
-    elif model_type == "3":
         second_prompt_chain = LLMChain(llm=chat_model, prompt=prediction_chat_gpt_report_prompt)
-    else:
+    elif model_type == "2":
         second_prompt_chain = LLMChain(llm=llm_model, prompt=prediction_chat_gpt_report_prompt)
+    else:
+        raise ValueError("Invalid model type selected. Please choose 1 or 2")
 
     prediction_response = second_prompt_chain.invoke(input={"caseinfo": case_info,
                                                             "code_context": code_context})
@@ -149,12 +154,12 @@ def biogpt_application(mode):
 
         knowledgebase_option = click.prompt(
             "Choose the Knowledgebase Update Option \n 1. Add Case Description \n 2. Add Code Dictionary \n 3. Add Patient Report \n 4. All of the above",
-            type=click.Choice(["1", "2", "3"])
+            type=click.Choice(["1", "2", "3", "4"])
         )
         # Initialize the Embedding Generator
         embedding_generator = EmbeddingGenerator(embedding_model)
 
-        # For creating vector store of case description data
+        # For creating vector store of case description data (Experimentation Only - Not to be used in Production)
         if knowledgebase_option in ["1", "4"]:
             logger.info("Updating Knowledgebase with Case Description Data")
             _knowledge_base_creation(default_path="../resources/final_biomedical_data.csv",
@@ -192,8 +197,8 @@ def biogpt_application(mode):
         result_filename = click.prompt("Enter the name of the file to save results",
                                        type=click.STRING,
                                        default="result_biogpt.csv")
-        model_type = click.prompt("Choose the Model for ICD Code Prediction \n 1. BioGPT \n 2. Azure OpenAI  \n 3. "
-                                  "GPT-4",
+        model_type = click.prompt("Choose the Model for ICD Code Prediction \n 1. GPT-4 32K  \n 2. "
+                                  "Azure OpenAI (GPT-35 Turbo)",
                                   type=click.Choice(["1", "2", "3"]))
         prediction_type = click.prompt("Choose the Prediction Type \n 1. Case Prediction \n 2. Prediction with Report",
                                        type=click.Choice(["1", "2"]))

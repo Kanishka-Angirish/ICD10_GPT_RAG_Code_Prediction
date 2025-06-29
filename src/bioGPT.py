@@ -44,12 +44,13 @@ chat_model = AzureChatOpenAI(
     max_retries=2
 )
 
+# ============ Deprecated Code ============
 # Pre-trained tokenizer for Bio Gpt
-tokenizer = BioGptTokenizer.from_pretrained("microsoft/biogpt-large", clean_up_tokenization_spaces=True)
-causal_model.to("mps")
+# tokenizer = BioGptTokenizer.from_pretrained("microsoft/biogpt-large", clean_up_tokenization_spaces=True)
+# causal_model.to("mps")
 
 # HUGGING FACE PIPELINE FOR BIOGPT WHICH COULD BE USED FOR ANSWERING USER QUERY
-causal_generator = pipeline("text-generation", model=causal_model, tokenizer=tokenizer)
+# causal_generator = pipeline("text-generation", model=causal_model, tokenizer=tokenizer)
 
 # Wrap the hugging face pipeline around LangChain
-causal_llm = HuggingFacePipeline(pipeline=causal_generator)
+# causal_llm = HuggingFacePipeline(pipeline=causal_generator)
