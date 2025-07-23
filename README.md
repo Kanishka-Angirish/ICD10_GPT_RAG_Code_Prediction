@@ -72,7 +72,7 @@ The application supports two modes:
 ## File Structure
 
 - `src/main.py`: Entry point for the application.
-- `src/bioGPT.py`: Contains BioGPT model setup and integration.
+- `src/gptmodels.py`: Contains GPT model setup and integration.
 - `src/prompts.py`: Defines prompt templates for ICD-10 code prediction.
 - `src/utils.py`: Utility functions for logging, vector store management, and data processing.
 - `src/faiss_vector_store.py`: Handles vector store operations using FAISS.
